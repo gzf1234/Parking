@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Title</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="/public/JqueryUI/css/base/jquery-ui-1.10.4.custom.min.css">
+	<script src="/public/JqueryUI/js/jquery-1.10.2.js"></script>
+	<script src="/public/JqueryUI/js/jquery-ui-1.10.4.custom.min.js"></script>
+</head>
+<style>
+body{
+	font-family:"Microsoft YaHei";
+}
+#tab{
+	width: 600px;
+	margin: 0 auto;
+}
+.tab-tit{
+	font-size: 0;
+	width: 600px;
+}
+.tab-tit a{
+	display: inline-block;
+	height: 40px;
+	line-height: 40px;
+	font-size: 16px;
+	width: 200px;
+	text-align: center;
+	background: #ccc;
+	color: #333;
+	text-decoration: none;
+}
+.tab-tit .cur{
+	background: #09f;
+	color: #fff;
+}
+.tab-con div{
+	border: 1px solid #ccc;
+	height: 400px;
+	padding-top: 20px;
+}
+</style>
+<body>
+	<div id="tab">
+		<div class="tab-tit">
+			<!--点击设置curId的值  如果curId等于0，第一个a添加cur类名，如果curId等于1，第二个a添加cur类名，以此类推。添加了cur类名，a就会改变样式 @click,:class ,v-show这三个是vue常用的指令或添加事件的方式-->
+			<a href="javascript:;" @click="curId=0" :class="{'cur':curId===0}">停车场信息录入</a>
+			<a href="javascript:;" @click="curId=1" :class="{'cur':curId===1}">接机信息查询</a>
+			<a href="javascript:;" @click="curId=2" :class="{'cur':curId===2}">统计</a>
+		</div>
+		<div class="tab-con">
+			<!--根据curId的值显示div,如果curId等于0，第一个div显示，其它三个div不显示。如果curId等于1，第二个div显示，其它三个div不显示。以此类推-->
+			<div v-show="curId===0" >
+				车牌 : <input name="CarId" v-model="inputData.CarId" placeholder="edit me">
+				<br/>
+				航班号 : <input name="FlightNumber"  v-model="inputData.FlightNumber" placeholder="edit me">
+				<br/>
+				飞行时间 : <input name="FlyTime"  v-model="inputData.FlyTime" placeholder="edit me">
+				<br/>
+				到达时间 : <input name="ArriveTime"  v-model="inputData.ArriveTime" placeholder="edit me">
+				<br/>
+				停车时间 : <input name="ParkDate" v-model="inputData.ParkDate" placeholder="edit me">
+				<br/>
+				手机号 : <input name="Phone" v-model="inputData.Phone" placeholder="edit me">
+				<br/>
+				停车区域 : <input name="ParkPlace" v-model="inputData.ParkPlace" placeholder="edit me">
+				<br/>
+				回来人数 : <input name="BackPersons" v-model="inputData.BackPersons" placeholder="edit me">
+				<br/>
+				行李箱数目 : <input name="BoxNum" v-model="inputData.BoxNum" placeholder="edit me">
+				<br/>
+				<button v-on:click="inputSub">提交</button>
+			</div>
+			<div v-show="curId===1">
+				<li v-for="item in flyInfoData"> 
+					<div style="background-color:rgb(255,0,255);height: 20%; ">
+
+						车牌：{{ item['CarId'] }}
+						<br/>
+						预计航班出发到达时间{{ item['ArriveTime'] }}
+						<br/>
+						停车区域：（ {{ item['ParkPlace'] }} ）区
+						<br/>
+						预计收费：（ {{ item['Fee'] }}）元
+						<br/>
+						回来人数：（{{ item['BackPersons'] }}）位（{{ item['BoxNum'] }}）个箱子
+						<br/>
+
+					</div>
+				</li> 
+			</div>
+			<div v-show="curId===2">
+				<div>
+					<p>日期：<input type="text" id="datepicker" v-model="todayData"></p> 
+					<button v-on:click="getTodayData">获取</button>
+					<br/>
+					今日停车数量（ ）
+					<br/>
+					今日取车数量（ ）
+					<br/>
+					今日总停放车辆（ ）
+					<br/>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+<script src="https://unpkg.com/vue/dist/vue.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+	var dataPicker  ;
+	$(function() {	
+		dataPicker =  $("#datepicker");
+		$( "#datepicker" ).datepicker();
+		$( "#datepicker" ).datepicker( "option", "dateFormat", "yy-mm-dd" );
+		
+	});
+	var instance = axios.create({
+		baseURL:"http://127.0.0.1:8080",
+		timeout:1000,
+		headers: {
+			'X-Custom-Header':'foobar',
+			'Content-Type':'application/x-www-form-urlencoded'
+		}
+	});
+	var vm = new Vue({
+		el: '#tab',
+		data: {
+			curId: 0,
+			testName:'ttt',
+			inputData:{
+				CarId:'',
+				FlightNumber:'',
+				FlyTime:'',
+				ArriveTime:'', 
+				ParkDate:'',
+				Phone:'', 
+				ParkPlace:'', 
+				BackPersons:'', 
+				BoxNum:''
+			},
+			flyInfoData:[],
+			todayData:'',
+			todayDataInfo:{
+
+			}
+		},
+		computed: {},
+		methods: {
+			inputSub:function(event){
+				
+				console.log(JSON.stringify(vm.inputData));
+				instance.post('/api/index.php', vm.inputData)
+				.then(function (response) {
+					console.log(response);
+					alert(JSON.stringify(response));
+				})
+				.catch(function (error) {
+					console.log(error);
+				});
+			},
+			getInfoData:function(event){
+				instance.get('/api/query_info.php', this.inputData)
+				.then(function (response) {
+					console.log(response);
+					var json=JSON.stringify(response.data.infos);
+					console.log(json);
+					vm.flyInfoData=response.data.infos;
+                   //	console.log(this.flyInfoData.length);
+                   vm.testName = "sdfdsaf";
+               })
+				.catch(function (error) {
+					console.log(error);
+				});
+			},
+			getTodayData:function(event){
+				var dataTime = dataPicker.val();
+				instance.post('/api/count_info', {
+					"QueryDate":dataTime
+				})
+				.then(function (response) {
+					console.log(response);
+					//alert(JSON.stringify(response));
+				})
+				.catch(function (error) {
+					console.log(error);
+				});
+			}
+		},
+		mounted: function () {
+		}
+	});
+	vm.$watch('curId',function(){
+		if (vm.curId === 1) {
+			vm.getInfoData();
+		}else if(vm.curId === 2){
+			
+		}
+	});
+	
+</script>
+</html>

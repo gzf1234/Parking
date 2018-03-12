@@ -33,34 +33,61 @@ service_status_xpath = '//li[@class="fc_tableLi9"]/a[1]/text()'
 def custom_flight():
     while True:
         keys = conn.keys() # 获取所有CarId
+        user_list = []
+        carId_list = []
+        arrive_time_list = []
+        pipe = conn.pipeline(False)
         for key in keys:
             CarId = conn.hmget(key, 'CarId')[0].decode()
             FlyDate = conn.hmget(key, 'FlyDate')[0].decode()
             FlightNum = conn.hmget(key, 'FlightNum')[0].decode()
-            root_url = base_url.format(FlightNum=FlightNum, Date=''.join(re.findall(r'\d+', FlyDate)))
-            res = requests.get(root_url, headers=headers)
-            sel = etree.HTML(res.text)
-            fly_time = sel.xpath(fly_time_xpath)[0] # 18:10
-            FlyTime = FlyDate + ' ' + fly_time # 2018-01-02 18:12
-            detal_hour = get_detal(FlyTime)
-            # 将起飞后1小时的航班添加到定制航班中
-            if detal_hour >= 1:
-                dep = sel.xpath(dep_xpath)[0] # 出发地
-                arr = sel.xpath(arr_xpath)[0] # 到达地
-                dep = re.search(r'(.*?)[a-zA-Z0-9]', dep).group(1)
-                arr = re.search(r'(.*?)[a-zA-Z0-9]', arr).group(1)
-                dep_code, arr_code = get_air_code(dep, arr)
-                post_data = {
-                    'fnum': FlightNum,
-                    'depCode': dep_code,
-                    'arrCode': arr_code,
-                    'fdate': '/'.join(FlyDate.split('-')),
-                    'orderStyle': '1',
-                    'mobile': MOBILE,
-                    'tel': TEL,
-                    'name': NAME,
-                }
-                send_custom_mes(post_data, CarId)
+            FlyTime = conn.hmget(key, 'FlyTime')[0].decode
+            apart_hour = get_detal(FlyTime)
+            # 如果用户没有flytime属性或者是起飞前4小时
+            if FlyTime is None or apart_hour <= 4:
+                root_url = base_url.format(FlightNum=FlightNum, Date=''.join(re.findall(r'\d+', FlyDate)))
+                # 请求每个还在redis中的用户的航班信息
+                res = requests.get(root_url, headers=headers)
+                sel = etree.HTML(res.text)
+                fly_time = sel.xpath(fly_time_xpath)[0] # 18:10
+                FlyTime = FlyDate + ' ' + fly_time # 2018-01-02 18:12
+                pipe.hmset(CarId, {'FlyTime': FlyTime})
+                detal_hour = get_detal(FlyTime)
+                # 获取航班的计划达到时间
+                arrive_time = sel.xpath('//div[@class="li_com"]/span[5]/@aplan')[0]
+                carId_list.append(CarId)
+                arrive_time_list.append(arrive_time)
+                # 将起飞前4小时的航班添加到定制航班中
+                if detal_hour <= 4:
+                    dep = sel.xpath(dep_xpath)[0] # 出发地
+                    arr = sel.xpath(arr_xpath)[0] # 到达地
+                    dep = re.search(r'(.*?)[a-zA-Z0-9]', dep).group(1)
+                    arr = re.search(r'(.*?)[a-zA-Z0-9]', arr).group(1)
+                    dep_code, arr_code = get_air_code(dep, arr)
+                    post_data = {
+                        'fnum': FlightNum,
+                        'depCode': dep_code,
+                        'arrCode': arr_code,
+                        'fdate': '/'.join(FlyDate.split('-')),
+                        'orderStyle': '1',
+                        'mobile': MOBILE,
+                        'tel': TEL,
+                        'name': NAME,
+                    }
+                    send_custom_mes(post_data, CarId)
+        pipe.execute()
+        # 更新用户航班到达时间
+        with app.app_context():
+            for item in zip(carId_list, arrive_time_list):
+                user = User.query.filter_by(CarId=item[0]).first()
+                user.ArriveTime = item[1]
+                user_list.append(user)
+            db.session.add_all(user_list)
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+
         time.sleep(3600)
 
 # 获取机场code

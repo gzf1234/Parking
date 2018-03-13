@@ -9,9 +9,9 @@ import re
 from myapp.api import api
 from myapp.models import User, OldUser, Parker
 from myapp.models import db
-from myapp.decorators import varify_token
 from settings import DAY_FEE, TRAVEL_FEE
 from myapp.utils import get_fee
+from logger import logger
 
 conn = redis.Redis(host='127.0.0.1', port=6379, db=1)
 @api.route('/login.php', methods=['POST'])
@@ -58,12 +58,12 @@ def add_info():
             BackPersons = BackPersons,
             BoxNum = BoxNum,
         )
-        print(user)
+        # print(user)
         try:
             db.session.add(user)
             db.session.commit()
         except Exception as e:
-            print(e)
+            logger.error(e)
             db.session.rollback()
             return jsonify({'status':'1'})
         conn.hmset(CarId, {'CarId':CarId, 'FlightNum':FlightNumber, 'FlyDate':FlyDate})
@@ -97,7 +97,7 @@ def query_info():
             info['ParkPlace'] = user.ParkPlace
             info['BackPersons'] = user.BackPersons
             info['BoxNum'] = user.BoxNum
-            if ArriveTime is not None: # 计算停车费同
+            if ArriveTime is not None: # 计算停车费用
                 delta = get_fee(ArriveTime, ParkDate)
                 Fee = delta * DAY_FEE + TRAVEL_FEE
                 info['Fee'] = Fee
@@ -105,8 +105,13 @@ def query_info():
                 user.Fee = Fee
             infos.append(info)
             users.append(user)
-        db.session.add_all(users) # add user.Fee to db
-        db.session.commit()
+        try:
+            db.session.add_all(users) # add user.Fee to db
+            db.session.commit()
+        except Exception as e:
+            logger.error(e)
+            db.session.rollback()
+            return jsonify({'status':'1'})
         return jsonify({'status':'2', 'infos':infos})
     return jsonify({'status':'0'})
 
@@ -140,9 +145,11 @@ def user_leave():
             db.session.add(olduser)
             db.session.delete(user)
             db.session.commit()
-        except:
+        except Exception as e:
+            logger.error(e)
             db.session.rollback()
-        conn.delete(CarId)
+            return jsonify({'status':'1'})
+        # conn.delete(CarId)
         return jsonify({'status':'2'})
     return jsonify({'status':'0'})
 

@@ -32,10 +32,10 @@ def login():
 # add user.infos to table(user)
 @api.route('/index.php', methods=['POST'])
 def add_info():
-    token = request.form.get('token')
-    parker = Parker.query.filter_by(token=token)
-    if True:
+    # token = request.form.get('token')
+    # parker = Parker.query.filter_by(token=token)
     # if parker:
+    if True:
         CarId = request.form.get('CarId')
         FlightNumber = request.form.get('FlightNumber')
         FlyDate = request.form.get('FlyTime')
@@ -75,9 +75,10 @@ def add_info():
 # query user_infos by date
 @api.route('/query_info.php', methods=['POST'])
 def query_info():
-    token = request.form.get('token')
-    parker = Parker.query.filter_by(token=token).first()
-    if parker:
+    # token = request.form.get('token')
+    # parker = Parker.query.filter_by(token=token).first()
+    # if parker:
+    if True:
         query_date = request.form.get('QueryDate') # 2018-02-03
         all_users = User.query.filter_by(FlyDate=query_date).all() # list
         if not all_users:
@@ -113,9 +114,10 @@ def query_info():
 # 顾客付完费用离开后，将user add to table(olduser)
 @api.route('/user_leave.php', methods=['POST'])
 def user_leave():
-    token = request.form.get('token')
-    parker = Parker.query.filter_by(token=token).first()
-    if parker:
+    # token = request.form.get('token')
+    # parker = Parker.query.filter_by(token=token).first()
+    # if parker:
+    if True:
         CarId = request.form.get('CarId')
         user = User.query.filter_by(CarId=CarId).first()
         if not user:
@@ -145,30 +147,12 @@ def user_leave():
     return jsonify({'status':'0'})
 
 
-@api.route('/change_pwd.php', methods=['POST'])
-def change_pwd():
-    token = request.form.get('token')
-    parker = Parker.query.filter_by(token=token).first()
-    if parker:
-        old_pwd = request.form.get('old_pwd')
-        if parker.varify_password(old_pwd):
-            account = parker.account
-            new_pwd = request.form.get('new_pwd')
-            token = parker.token
-            new_parker = Parker(account=account, password=new_pwd, token=token)
-            db.session.delete(parker)
-            db.session.add(new_parker)
-            db.session.commit()
-            return jsonify({'status':'2'})
-        return jsonify({'status':'1'})
-    return jsonify({'status':'0'})
-
-
 @api.route('/count_info.php', methods=['POST'])
 def count_info():
-    token = request.form.get('token')
-    parker = Parker.query.filter_by(token=token).first()
-    if parker:
+    # token = request.form.get('token')
+    # parker = Parker.query.filter_by(token=token).first()
+    # if parker:
+    if True:
         query_date = request.form.get('QueryDate')
         leave_users = OldUser.query.filter_by(LeaveDate=query_date).all()
         if not leave_users:
@@ -192,3 +176,21 @@ def count_info():
     return jsonify({'status':'0'})
 
 
+@api.route('/change_pwd.php', methods=['POST'])
+def change_pwd():
+    token = request.form.get('token')
+    parker = Parker.query.filter_by(token=token).first()
+    if parker:
+    # if True:
+        old_pwd = request.form.get('old_pwd')
+        if parker.varify_password(old_pwd):
+            account = parker.account
+            new_pwd = request.form.get('new_pwd')
+            token = parker.token
+            new_parker = Parker(account=account, password=new_pwd, token=token)
+            db.session.delete(parker)
+            db.session.add(new_parker)
+            db.session.commit()
+            return jsonify({'status':'2'})
+        return jsonify({'status':'1'})
+    return jsonify({'status':'0'})

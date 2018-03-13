@@ -14,6 +14,7 @@ from myapp.models import db, User
 from myapp.utils import get_detal
 from settings import SKIP_TIME, MOBILE, TEL, NAME
 from myapp import create_app
+from logger import logger
 
 app = create_app('default')
 conn0 = redis.Redis(host='127.0.0.1', port=6379, db=0)
@@ -87,7 +88,7 @@ def custom_flight():
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
-
+                logger.error(e)
         time.sleep(3600)
 
 # 获取机场code
@@ -118,18 +119,20 @@ def query_info():
         # get a dict key:flight_num value:arrive_time
         flight_arrive = dict(zip(flight_num_list, arrive_time_list))
         # 更新用户航班到达时间
-        with app.app_context():
-            for FlightNum, ArriveTime in flight_arrive.items():
-                new_users = []
-                users = User.query.filter_by(FlightNum=FlightNum).all()
-                for user in users:
-                    user.ArriveTime = ArriveTime
-                    new_users.append(user)
-                try:
+        try:
+            with app.app_context():
+                for FlightNum, ArriveTime in flight_arrive.items():
+                    new_users = []
+                    users = User.query.filter_by(FlightNum=FlightNum).all()
+                    for user in users:
+                        user.ArriveTime = ArriveTime
+                        new_users.append(user)
+
                     db.session.add_all(new_users)
                     db.session.commit()
-                except Exception:
-                    print('添加ArriveTime出错!')
+        except Exception as e:
+            logger.error(e)
+
         del_custom_flight(sel)
 
 # 将那些已经显示'服务结束'的航班从定制记录中删除
@@ -168,14 +171,13 @@ def send_del_mes(form):
         print('取消订阅航班失败,需要处理cookie!')
 
 def run():
-
     try:
         t = threading.Thread(target=custom_flight, name='threading_to_custom')
         t.setDaemon(True) # set daemon so main thread can exit when receives ctrl-c
         t.start()
-    except Exception:
-        print('Error: unable to start thread to custom flight!')
-
+    except Exception as e:
+        # print('Error: unable to start thread to custom flight!')
+        logger.error(e)
     while True:
         query_info()
         time.sleep(3600)

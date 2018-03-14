@@ -13,7 +13,7 @@ class Config(object):
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://car:car@192.168.200.129:3306/car'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://car:car@118.25.42.92:3306/car'
     # SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://car:car@localhost:3306/car'
     SQLALCHEMY_TRACK_MODIFICATIONS = True
 

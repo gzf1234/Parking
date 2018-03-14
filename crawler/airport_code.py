@@ -22,6 +22,7 @@ def get_city_code(url):
         airport_name_list = sel.xpath(airport_name_xpath)
         airport_code_list = sel.xpath(airport_code_xpath)
         airport_name_list = [airport_name.replace('机场','').strip() for airport_name in airport_name_list]
+        airport_name_list = [airport_name.replace('国际','').strip() for airport_name in airport_name_list]
         # d = dict(zip(airport_name_list, airport_code_list))
         length = len(airport_code_list)
         for i in range(0, length):

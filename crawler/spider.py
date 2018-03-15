@@ -9,7 +9,6 @@ import json
 from lxml import etree
 import threading
 import random
-from PIL import Image
 
 from myapp.models import db, User
 from myapp.utils import get_detal
@@ -19,7 +18,7 @@ from logger import logger
 from settings import USERAGENT
 
 app = create_app('default')
-conn0 = redis.Redis(host='118.25.42.92', port=6379, db=0)
+# conn0 = redis.Redis(host='118.25.42.92', port=6379, db=0)
 conn = redis.Redis(host='118.25.42.92', port=6379, db=1)
 # ua = UserAgent(use_cache_server=False)
 base_url = 'http://www.variflight.com/flight/fnum/{FlightNum}.html?AE71649A58c77&fdate={Date}'
@@ -68,12 +67,8 @@ def custom_flight():
                 arrive_time_list.append(arrive_time)
                 # 将起飞前4小时的航班添加到定制航班中
                 if detal_hour <= 4:
-                    dep = sel.xpath(dep_xpath)[0] # 出发地
-                    arr = sel.xpath(arr_xpath)[0] # 到达地
-                    dep = re.search(r'(.*?)[a-zA-Z0-9]', dep).group(1)
-                    arr = re.search(r'(.*?)[a-zA-Z0-9]', arr).group(1)
                     # print(CarId)
-                    dep_code, arr_code = get_air_code(dep, arr)
+                    dep_code, arr_code = get_air_code(sel, CarId)
                     post_data = {
                         'fnum': FlightNum,
                         'depCode': dep_code,
@@ -106,26 +101,14 @@ def custom_flight():
                 logger.error(e)
         time.sleep(3600)
 
-# def handle_captcha(sel):
-#     captcha_href = sel.xpath('//img[@id="authCodeImg"]/@src')[0]
-#     img_url = 'http://www.variflight.com' + captcha_href
-#     res = requests.get(img_url)
-#     with open('img', 'wb') as f:
-#         f.write(res.content)
-#     image = Image.open('img')
-#     image.show()
-#     code = input('输入验证码>')
-#     requests.get(captcha_url.format(code=code))
-#     print('ok')
-
 # 获取机场code
-def get_air_code(dep_name, arr_name):
-    pipe = conn0.pipeline(False)
-    pipe.get(dep_name.encode('utf-8'))
-    pipe.get(arr_name.encode('utf-8'))
-    dep_code, arr_code = pipe.execute()
-    # print(dep_code, arr_code)
-    return dep_code.decode(), arr_code.decode()
+def get_air_code(sel, CarId):
+    code_xpath = '//span[@class="fob"]/a/@href'
+    h = sel.xpath(code_xpath)[0]
+    dep_code = re.search(r'.*?depCode=(.*?)\&', h).group(1)
+    arr_code = re.search(r'.*?arrCode=(.*)', h).group(1)
+    conn.hmset(CarId, {'dep_code':dep_code,'arr_code':arr_code})
+    return dep_code, arr_code
 
 # 定制航班
 def send_custom_mes(post_data, car_id):
@@ -181,13 +164,22 @@ def del_custom_flight(sel):
     for z in zs:
         k = dict(zip(keys, z))
         values.append(k)
+    cars = []
+    flights = []
+    #获取dict(航班号：CarID)
+    for key in conn.keys():
+        cars.append(key)
+        flights.append(key.get('FlightNum'))
+    car_flight_dict = dict(zip(flights,cars))
+
     info_dict = dict(zip(flight_num_list, values))
     for FlightNum, info in info_dict.items():
         if info.get('service') == '服务结束':
+            CarId = car_flight_dict.get(FlightNum)
             post_form = {
                 'fnum': FlightNum,
-                'depCode': conn0.get(info.get('dep').encode('utf-8')).decode(),
-                'arrCode': conn0.get(info.get('arr').encode('utf-8')).decode(),
+                'depCode': conn.hget(CarId, 'dep_code'),
+                'arrCode': conn.hget(CarId, 'arr_code'),
                 'fdate': info.get('FlyTime')
             }
             send_del_mes(post_form)

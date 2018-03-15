@@ -17,6 +17,7 @@ requests = "*"
 fake-useragent = "*"
 lxml = "*"
 redis = "*"
+selenium = "*"
 
 
 [dev-packages]

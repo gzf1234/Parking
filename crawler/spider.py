@@ -13,7 +13,7 @@ from PIL import Image
 
 from myapp.models import db, User
 from myapp.utils import get_detal
-from settings import SKIP_TIME, MOBILE, TEL, NAME
+from settings import SKIP_TIME, MOBILE, TEL, NAME, PWD
 from myapp import create_app
 from logger import logger
 from settings import USERAGENT
@@ -36,18 +36,18 @@ service_status_xpath = '//li[@class="fc_tableLi9"]/a[1]/text()'
 
 def custom_flight():
     while True:
+        print('进行订阅')
         apart_hour = 100
         keys = conn.keys() # 获取所有CarId
         user_list = []
         carId_list = []
         arrive_time_list = []
-        pipe = conn.pipeline(False)
         for key in keys:
             CarId = conn.hmget(key, 'CarId')[0].decode()
             FlyDate = conn.hmget(key, 'FlyDate')[0].decode()
             FlightNum = conn.hmget(key, 'FlightNum')[0].decode()
             try:
-                FlyTime = conn.hmget(key, 'FlyTime')[0].decode
+                FlyTime = conn.hmget(key, 'FlyTime')[0].decode()
                 apart_hour = get_detal(FlyTime)
             except:
                 FlyTime = None
@@ -58,11 +58,9 @@ def custom_flight():
                 # 请求每个还在redis中的用户的航班信息
                 res = requests.get(root_url, headers=headers)
                 sel = etree.HTML(res.text)
-                if '验证' in res.text:
-                    handle_captcha(sel)
                 fly_time = sel.xpath(fly_time_xpath)[0] # 18:10
                 FlyTime = FlyDate + ' ' + fly_time # 2018-01-02 18:12
-                pipe.hmset(CarId, {'FlyTime': FlyTime})
+                conn.hmset(CarId, {'FlyTime': FlyTime})
                 detal_hour = get_detal(FlyTime)
                 # 获取航班的计划达到时间
                 arrive_time = sel.xpath('//div[@class="li_com"]/span[5]/@aplan')[0]
@@ -74,7 +72,7 @@ def custom_flight():
                     arr = sel.xpath(arr_xpath)[0] # 到达地
                     dep = re.search(r'(.*?)[a-zA-Z0-9]', dep).group(1)
                     arr = re.search(r'(.*?)[a-zA-Z0-9]', arr).group(1)
-                    print(CarId)
+                    # print(CarId)
                     dep_code, arr_code = get_air_code(dep, arr)
                     post_data = {
                         'fnum': FlightNum,
@@ -86,11 +84,17 @@ def custom_flight():
                         'tel': TEL,
                         'name': NAME,
                     }
+                    # print(post_data)
                     send_custom_mes(post_data, CarId)
-        pipe.execute()
         # 更新用户航班到达时间
         with app.app_context():
+            if len(carId_list) == 0:
+                print('没有一个用户需要更新arriveTime')
+                time.sleep(3600 )
+                continue
             for item in zip(carId_list, arrive_time_list):
+                print('更新用户航班到达时间')
+                print(item)
                 user = User.query.filter_by(CarId=item[0]).first()
                 user.ArriveTime = item[1]
                 user_list.append(user)
@@ -102,18 +106,17 @@ def custom_flight():
                 logger.error(e)
         time.sleep(3600)
 
-def handle_captcha(sel):
-    captcha_href = sel.xpath('//img[@id="authCodeImg"]/@src')[0]
-    img_url = 'http://www.variflight.com' + captcha_href
-    res = requests.get(img_url)
-    with open('img', 'wb') as f:
-        f.write(res.content)
-    image = Image.open('img')
-    image.show()
-    code = input('输入验证码>')
-    requests.get(captcha_url.format(code=code))
-    print('ok')
-
+# def handle_captcha(sel):
+#     captcha_href = sel.xpath('//img[@id="authCodeImg"]/@src')[0]
+#     img_url = 'http://www.variflight.com' + captcha_href
+#     res = requests.get(img_url)
+#     with open('img', 'wb') as f:
+#         f.write(res.content)
+#     image = Image.open('img')
+#     image.show()
+#     code = input('输入验证码>')
+#     requests.get(captcha_url.format(code=code))
+#     print('ok')
 
 # 获取机场code
 def get_air_code(dep_name, arr_name):
@@ -127,23 +130,18 @@ def get_air_code(dep_name, arr_name):
 # 定制航班
 def send_custom_mes(post_data, car_id):
     res = requests.post(url=custom_url, data=post_data, headers=custom_headers)
-    if '验证' in res.text:
-        sel = etree.HTML(res.text)
-        handle_captcha(sel)
     status = json.loads(res.text).get('status')
     if status == False:
-        print('订阅航班失败,需要处理cookie')
+        logger.error(res.text)
+        # print('订阅航班失败,需要处理cookie')
     else:
         # 对于定制成功的user 将其从redis中删除
         conn.delete(car_id)
 
 # 定时查询那些关注的航班信息
 def query_info():
+    print('进行查询关注的航班信息')
     res = requests.get(query_url, headers=custom_headers)
-    if '验证' in res.text:
-        time.sleep(10)
-        sel = etree.HTML(res.text)
-        handle_captcha(sel)
     if res.status_code == 200:
         sel = etree.HTML(res.text)
         flight_nums = sel.xpath(flight_num_xpath)
@@ -176,7 +174,6 @@ def del_custom_flight(sel):
     flight_num_list = [flight.strip() for flight in flight_num_list]
     dep_list = sel.xpath('//div[@id="recordTable"]//li[@class="fc_tableLi3"]/text()')
     arr_list = sel.xpath('//div[@id="recordTable"]//li[@class="fc_tableLi5"]/text()')
-
     # info_dict = {'FlightNum': {'service': , 'dep': , 'arr': , 'FlyTime':}}
     keys = ['service', 'dep', 'arr', 'FlyTime']
     values = []
@@ -185,7 +182,6 @@ def del_custom_flight(sel):
         k = dict(zip(keys, z))
         values.append(k)
     info_dict = dict(zip(flight_num_list, values))
-
     for FlightNum, info in info_dict.items():
         if info.get('service') == '服务结束':
             post_form = {
@@ -199,12 +195,10 @@ def del_custom_flight(sel):
 # 发送请求,取消航班订阅
 def send_del_mes(form):
     res = requests.post(url=del_custom_url, headers=custom_headers, data=form)
-    if '验证' in res.text:
-        sel = etree.HTML(res.text)
-        handle_captcha(sel)
     status = json.loads(res.text).get('status')
     if status == False:
-        print('取消订阅航班失败,需要处理cookie!')
+        logger.error(res.text)
+        # print('取消订阅航班失败,需要处理cookie!')
 
 def run():
     try:
@@ -220,11 +214,27 @@ def run():
 
 
 if __name__ == '__main__':
-    custom_headers = {
-        'User-Agent': random.choice(USERAGENT),
-        'Cookie': '_ga=GA1.2.477496055.1520252476; PHPSESSID=v1sl8olkkquk4k19qfu3emmvu7; orderRole=1; fnumHistory=%5B%7B%22fnum%22%3A%22HU7607%22%7D%2C%7B%22fnum%22%3A%22AC111%22%7D%2C%7B%22fnum%22%3A%22HX239%22%7D%2C%7B%22fnum%22%3A%22VN569%22%7D%2C%7B%22fnum%22%3A%22GS6572%22%7D%2C%7B%22fnum%22%3A%22CA111%22%7D%5D; Hm_lvt_d1f759cd744b691c20c25f874cadc061=1520915392,1520942341,1520942609,1520942629; citiesHistory=%5B%7B%22depCode%22%3A%22SHA%22%2C%22arrCode%22%3A%22CTU%22%2C%22depCity%22%3A%22%5Cu4e0a%5Cu6d77%5Cu8679%5Cu6865%22%2C%22arrCity%22%3A%22%5Cu6210%5Cu90fd%5Cu53cc%5Cu6d41%22%7D%2C%7B%22depCode%22%3A%22PEK%22%2C%22arrCode%22%3A%22HGH%22%2C%22depCity%22%3A%22%5Cu5317%5Cu4eac%5Cu9996%5Cu90fd%22%2C%22arrCity%22%3A%22%5Cu676d%5Cu5dde%5Cu8427%5Cu5c71%22%7D%2C%7B%22depCode%22%3A%22PEK%22%2C%22arrCode%22%3A%22SHA%22%2C%22depCity%22%3A%22%5Cu5317%5Cu4eac%5Cu9996%5Cu90fd%22%2C%22arrCity%22%3A%22%5Cu4e0a%5Cu6d77%5Cu8679%5Cu6865%22%7D%2C%7B%22depCode%22%3A%22SHA%22%2C%22arrCode%22%3A%22HGH%22%2C%22depCity%22%3A%22%5Cu4e0a%5Cu6d77%5Cu8679%5Cu6865%22%2C%22arrCity%22%3A%22%5Cu676d%5Cu5dde%5Cu8427%5Cu5c71%22%7D%5D; salt=5aa7df9c74b6d; DIGCT=wBNZ81LBtR7YSZujrTamZEq9wmvFl5GlKJDwHcPM2AcB2sU4ZNqwBk1DLVD9sZ34fiAv7BtYJ4FiwiNVds9ho43mTC8kGp3frLbum%2F3oiFQNyIjRXHJSfA%3D%3D; Hm_lpvt_d1f759cd744b691c20c25f874cadc061=1520951726'
-    }
     headers = {
         'User-Agent': random.choice(USERAGENT),
+    }
+    # 登入获取cookie
+    login_url = 'http://www.variflight.com/login/reg/signIn?AE71649A58c77'
+    post_form = {
+        'phone': MOBILE,
+        'pwd': PWD,
+        'phoneCode': '86',
+        'keepLogin': '1',
+    }
+    response = requests.post(url=login_url, data=post_form, headers=headers)
+    Cookie_list = []
+    for k, v in response.cookies.items():
+        item = ''
+        item = ('%s=%s' % (k,v))
+        Cookie_list.append(item)
+    Cookie = '; '.join(Cookie_list)
+    print(Cookie)
+    custom_headers = {
+        'User-Agent': random.choice(USERAGENT),
+        'Cookie': Cookie,
     }
     run()

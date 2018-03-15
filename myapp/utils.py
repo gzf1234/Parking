@@ -56,8 +56,3 @@ def get_detal(fly_time):
     return detal_hour
 
 
-
-if __name__ == '__main__':
-    b = input('>>>')
-    b = get_detal(b)
-    print(b)

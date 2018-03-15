@@ -38,6 +38,7 @@ def add_info():
     if True:
         CarId = request.form.get('CarId')
         FlightNumber = request.form.get('FlightNumber')
+        FlightNumber = FlightNumber.upper() # 确保航班号英文字母都是大写
         FlyDate = request.form.get('FlyTime')
         # ArriveTime = request.form.get('BackDate')
         ParkDate = request.form.get('ParkDate')

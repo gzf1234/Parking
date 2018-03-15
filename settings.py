@@ -13,13 +13,16 @@ TRAVEL_FEE = 20
 # 访问定制航班的间隔时间(小时)
 SKIP_TIME = 1
 
-# 非常准绑定的手机号
+# 飞常准绑定的手机号
 MOBILE = '18058771631'
 
-# 非常准绑定的联系电话
+#飞常准登入密码
+PWD = '123456gzf'
+
+# 飞常准绑定的联系电话
 TEL = '18058771631'
 
-# 非常准name
+# 飞常准name
 NAME = '18058771631'
 
 # 定制航班的角色 0:乘机人 1:接机人 2: 送机人
@@ -35,3 +38,7 @@ USERAGENT = [
     'Mozilla/5.0 (X11; U; Linux x86_64; zh-CN; rv:1.9.2.10) Gecko/20100922 Ubuntu/10.10 (maverick) Firefox/3.6.10',
     'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; QQDownload 732; .NET4.0C; .NET4.0E)',
     ]
+
+
+
+

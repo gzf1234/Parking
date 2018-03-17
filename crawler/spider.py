@@ -9,6 +9,8 @@ import json
 from lxml import etree
 import threading
 import random
+import sys
+sys.path.append('/home/gzf/Parking')
 
 from myapp.models import db, User
 from myapp.utils import get_detal
@@ -18,8 +20,8 @@ from logger import logger
 from settings import USERAGENT
 
 app = create_app('default')
-# conn0 = redis.Redis(host='118.25.42.92', port=6379, db=0)
-conn = redis.Redis(host='118.25.42.92', port=6379, db=1)
+# conn0 = redis.Redis(host='127.0.0.1', port=6379, db=0)
+conn = redis.Redis(host='127.0.0.1', port=6379, db=1)
 # ua = UserAgent(use_cache_server=False)
 base_url = 'http://www.variflight.com/flight/fnum/{FlightNum}.html?AE71649A58c77&fdate={Date}'
 custom_url = 'http://www.variflight.com/follow/Customer/smsAddOrder?AE71649A58c77'
@@ -56,6 +58,8 @@ def custom_flight():
                 root_url = base_url.format(FlightNum=FlightNum, Date=''.join(re.findall(r'\d+', FlyDate)))
                 # 请求每个还在redis中的用户的航班信息
                 res = requests.get(root_url, headers=headers)
+                with open('tt.html', 'w') as f:
+                    f.write(res.text)
                 sel = etree.HTML(res.text)
                 fly_time = sel.xpath(fly_time_xpath)[0] # 18:10
                 FlyTime = FlyDate + ' ' + fly_time # 2018-01-02 18:12
@@ -79,7 +83,7 @@ def custom_flight():
                         'tel': TEL,
                         'name': NAME,
                     }
-                    # print(post_data)
+                    print(post_data)
                     send_custom_mes(post_data, CarId)
         # 更新用户航班到达时间
         with app.app_context():
@@ -168,8 +172,8 @@ def del_custom_flight(sel):
     flights = []
     #获取dict(航班号：CarID)
     for key in conn.keys():
-        cars.append(key)
-        flights.append(key.get('FlightNum'))
+        cars.append(key.decode())
+        flights.append(conn.hmget(key, 'FlightNum')[0].decode())
     car_flight_dict = dict(zip(flights,cars))
 
     info_dict = dict(zip(flight_num_list, values))
@@ -178,8 +182,8 @@ def del_custom_flight(sel):
             CarId = car_flight_dict.get(FlightNum)
             post_form = {
                 'fnum': FlightNum,
-                'depCode': conn.hget(CarId, 'dep_code'),
-                'arrCode': conn.hget(CarId, 'arr_code'),
+                'depCode': conn.hmget(CarId.encode('utf-8'), 'dep_code')[0],
+                'arrCode': conn.hmget(CarId.encode('utf-8'), 'arr_code')[0],
                 'fdate': info.get('FlyTime')
             }
             send_del_mes(post_form)
